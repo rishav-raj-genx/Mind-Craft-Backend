@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: mindcraft-backend
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEO4J_URI
+        sync: false
+      - key: NEO4J_USER
+        sync: false
+      - key: NEO4J_PASSWORD
+        sync: false
+      - key: NEO4J_DATABASE
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: SARVAM_STT_URL
+        value: https://api.sarvam.ai/speech-to-text
+      - key: SARVAM_CHAT_URL
+        value: https://api.sarvam.ai/v1/chat/completions
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
