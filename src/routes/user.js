@@ -20,6 +20,7 @@ const router  = express.Router();
 const { verifyFirebaseToken }   = require('../middleware/auth');
 const { formatValidationErrors } = require('../middleware/errorHandler');
 const { getDriver }             = require('../config/neo4j');
+const { awardTokens }           = require('../services/tokenEconomy');
 const { getUserSkillGraph }     = require('../services/matchingEngine');
 const { getBalance, getTransactionHistory } = require('../services/tokenEconomy');
 const { calculateStreak }       = require('../services/streakCalculator');
@@ -137,6 +138,11 @@ router.post(
           }
         });
         
+        // Award initial 5 tokens for sign up (acts as first daily login)
+        await awardTokens(uid, 5, 'daily_login');
+        userData.mind_tokens = 5;
+        userData.tokenBalance = 5;
+
         userData.teaches = req.body.teaches;
         userData.learns = req.body.learns;
         res.status(201).json({ success: true, data: userData });
