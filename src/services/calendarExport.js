@@ -92,15 +92,22 @@ async function exportSessionToCalendar(session, tokens, peerName = 'Peer', peerE
   const startDate = new Date(session.scheduledAt);
   const endDate   = new Date(startDate.getTime() + 60 * 60 * 1000); // 1-hour session
 
+  // Format as local IST string without Z to natively bind to the timezone
+  const formatAsIST = (d) => {
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const local = new Date(d.getTime() + istOffset);
+    return local.toISOString().replace('Z', '');
+  };
+
   const event = {
     summary:     `🎓 Mindcraft: ${session.skill} with ${peerName}`,
     description: buildDescription(session, peerName),
     start: {
-      dateTime: startDate.toISOString(),
+      dateTime: formatAsIST(startDate),
       timeZone: 'Asia/Kolkata',
     },
     end: {
-      dateTime: endDate.toISOString(),
+      dateTime: formatAsIST(endDate),
       timeZone: 'Asia/Kolkata',
     },
     reminders: {
