@@ -63,6 +63,7 @@ router.post(
         name:              req.body.name,
         email:             req.user.email,
         photoUrl:          req.user.picture || req.body.photoUrl || '',
+        gender:            req.body.gender || '',
         college:           req.body.college,
         collegeLocation:   req.body.collegeLocation || '',
         department:        req.body.department,
@@ -245,6 +246,30 @@ router.get('/:uid', verifyFirebaseToken, async (req, res, next) => {
   }
 });
 
+// ── DELETE /api/user/:uid ──────────────────────────────────────────────
+router.delete('/:uid', verifyFirebaseToken, async (req, res, next) => {
+  if (req.user.uid !== req.params.uid) {
+    return res.status(403).json({ success: false, error: 'Cannot delete another user\'s profile' });
+  }
+
+  const driver = getDriver();
+  const session = driver.session();
+  try {
+    await session.executeWrite(tx =>
+      tx.run(`
+        MATCH (u:User {uid: $uid})
+        DETACH DELETE u
+      `, { uid: req.params.uid })
+    );
+
+    res.json({ success: true, message: 'User deleted' });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
+
 // ── PATCH /api/user/:uid ──────────────────────────────────────────────
 router.patch('/:uid', verifyFirebaseToken, async (req, res, next) => {
   if (req.user.uid !== req.params.uid) {
@@ -254,7 +279,7 @@ router.patch('/:uid', verifyFirebaseToken, async (req, res, next) => {
   const uid = req.params.uid;
   const allowedFields = [
     'name', 'college', 'collegeLocation', 'department', 'year', 'teaches', 'learns',
-    'fcmToken', 'latitude', 'longitude', 'photoUrl', 'bannerUrl',
+    'fcmToken', 'latitude', 'longitude', 'photoUrl', 'bannerUrl', 'gender',
     'linkedinUsername', 'githubUsername', 'leetcodeUsername', 'codeforcesUsername', 'codechefUsername',
   ];
 

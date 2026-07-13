@@ -33,12 +33,13 @@ router.post('/book', verifyFirebaseToken, [
     }
 
     const sessionId = uuidv4();
+    const meetLink = req.body.meetLink || `https://meet.jit.si/MindCraft-${sessionId}`;
     const sessObj = {
       sessionId, matchId: req.body.matchId, teacherUid: req.body.teacherUid, learnerUid: req.body.learnerUid,
       skill: req.body.skill, scheduledAt: req.body.scheduledAt, duration: req.body.duration || 60,
       endTime: req.body.scheduledAt + (req.body.duration || 60) * 60000,
-      mode: req.body.mode, meetLink: req.body.meetLink || '', location: req.body.location || '',
-      notes: req.body.notes || '', status: SESSION_PENDING, rating: 0, ratingComment: '', createdAt: Date.now(),
+      mode: req.body.mode, meetLink, location: req.body.location || '',
+      notes: req.body.notes || '', status: SESSION_UPCOMING, rating: 0, ratingComment: '', createdAt: Date.now(),
     };
 
     const createRes = await session.executeWrite(tx => tx.run(`
@@ -47,17 +48,29 @@ router.post('/book', verifyFirebaseToken, [
       MATCH (t)-[:PARTICIPATES_IN]->(:ChatThread {id: $matchId})<-[:PARTICIPATES_IN]-(l)
       CREATE (s:Session) SET s = $sessObj
       CREATE (l)-[:ATTENDS]->(s)<-[:HOSTS]-(t)
-      RETURN s
+      RETURN s, l.name AS learnerName, t.name AS teacherName
     `, { teacherUid: sessObj.teacherUid, learnerUid: sessObj.learnerUid, matchId: sessObj.matchId, sessObj }));
 
     if (createRes.records.length === 0) {
       return res.status(404).json({ success: false, error: 'Matched users or chat thread not found' });
     }
 
+    const learnerName = createRes.records[0].get('learnerName') || 'a user';
+    const teacherName = createRes.records[0].get('teacherName') || 'a tutor';
+
     const { broadcastToGlobal } = require('../services/chatService');
+    
+    // Notify Teacher
     broadcastToGlobal(req.body.teacherUid, {
       type: 'global_notification', subType: 'session_booked',
-      data: { message: `New session request for ${req.body.skill}`, partnerName: req.user.name || 'a user' },
+      data: { message: `New session automatically booked for ${req.body.skill}`, partnerName: learnerName },
+      sessionId, timestamp: Date.now()
+    });
+
+    // Notify Learner
+    broadcastToGlobal(req.body.learnerUid, {
+      type: 'global_notification', subType: 'session_booked',
+      data: { message: `Your session for ${req.body.skill} is confirmed!`, partnerName: teacherName },
       sessionId, timestamp: Date.now()
     });
 
@@ -79,8 +92,9 @@ router.get('/:uid', verifyFirebaseToken, async (req, res, next) => {
 
     const query = `
       MATCH (me:User {uid: $uid})-[role:HOSTS|ATTENDS]->(s:Session)
+      WHERE ($status IS NULL OR s.status = $status)
       OPTIONAL MATCH (peer:User)-[:HOSTS|ATTENDS]->(s)
-      WHERE peer.uid <> $uid AND ($status IS NULL OR s.status = $status)
+      WHERE peer.uid <> $uid
       RETURN s, peer.name AS peerName
       ORDER BY s.scheduledAt ASC
       SKIP toInteger($offset) LIMIT toInteger($limit)
