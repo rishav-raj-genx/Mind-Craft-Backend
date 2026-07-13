@@ -28,6 +28,8 @@ const TOKENS_SESSION_COMPLETE   = 25;
 const TOKENS_STREAK_5           = 15;
 const TOKENS_STREAK_10          = 30;
 const TOKENS_STREAK_30          = 100;
+const TOKENS_DAILY_LOGIN        = 5;
+const TOKENS_BADGE_EARNED       = 50;
 
 // ── Predefined Skills (matches Android SKILLS_LIST) ───────────────────
 const SKILLS_LIST = [
@@ -102,6 +104,8 @@ module.exports = {
   TOKENS_STREAK_5,
   TOKENS_STREAK_10,
   TOKENS_STREAK_30,
+  TOKENS_DAILY_LOGIN,
+  TOKENS_BADGE_EARNED,
 
   // Lists
   SKILLS_LIST,

@@ -10,10 +10,20 @@ const BADGE_DEFINITIONS = [
   { id: 'problem_solver', name: 'Problem Solver', emoji: '🐛', description: 'Answer doubts in the forum', metric: 'doubtsAnswered', thresholds: [3, 10, 25], color: 'from-orange-500/20 to-orange-400/10', borderColor: 'border-orange-400/30', iconColor: 'text-orange-500' },
   { id: 'mentor', name: 'Mentor', emoji: '🎓', description: 'Teach sessions as a tutor', metric: 'sessionsTaught', thresholds: [3, 10, 30], color: 'from-blue-500/20 to-blue-400/10', borderColor: 'border-blue-400/30', iconColor: 'text-blue-600' },
   { id: 'top_rated', name: 'Top Rated', emoji: '⭐', description: 'Earn high ratings (avg ≥ 4.0)', metric: 'ratedSessions', thresholds: [5, 15, 30], color: 'from-yellow-500/20 to-yellow-400/10', borderColor: 'border-yellow-400/30', iconColor: 'text-yellow-500' },
-  { id: 'social_butterfly', name: 'Social Butterfly', emoji: '🤝', description: 'Study with unique mates', metric: 'uniqueMates', thresholds: [3, 10, 25], color: 'from-pink-500/20 to-pink-400/10', borderColor: 'border-pink-400/30', iconColor: 'text-pink-500' }
+  { id: 'social_butterfly', name: 'Social Butterfly', emoji: '🤝', description: 'Study with unique mates', metric: 'uniqueMates', thresholds: [3, 10, 25], color: 'from-pink-500/20 to-pink-400/10', borderColor: 'border-pink-400/30', iconColor: 'text-pink-500' },
+  { id: 'wealthy_mind', name: 'Wealthy Mind', emoji: '🪙', description: 'Accumulate Mind Tokens', metric: 'mindTokens', thresholds: [100, 500, 1000], color: 'from-yellow-500/20 to-yellow-400/10', borderColor: 'border-yellow-400/30', iconColor: 'text-yellow-500' }
 ];
 
 async function calculateBadges(uid) {
+  let mindTokens = 0;
+  const driver = getDriver();
+  const session = driver.session();
+  try {
+    const res = await session.executeRead(tx => tx.run('MATCH (u:User {uid: $uid}) RETURN coalesce(u.mind_tokens, 0) AS mind_tokens', { uid }));
+    if (res.records.length > 0) mindTokens = res.records[0].get('mind_tokens');
+    if (mindTokens && mindTokens.toNumber) mindTokens = mindTokens.toNumber();
+  } finally { await session.close(); }
+
   const [sessionMetrics, forumMetrics, streakData] = await Promise.all([ getSessionMetrics(uid), getForumMetrics(uid), calculateStreak(uid) ]);
   const metrics = {
     currentStreak: streakData.currentStreak, longestStreak: streakData.longestStreak,
@@ -21,6 +31,7 @@ async function calculateBadges(uid) {
     lateNightSessions: sessionMetrics.lateNightSessions, sessionsTaught: sessionMetrics.sessionsTaught,
     ratedSessions: sessionMetrics.ratedSessions, averageRating: sessionMetrics.averageRating,
     uniqueMates: sessionMetrics.uniqueMates, doubtsAnswered: forumMetrics.doubtsAnswered,
+    mindTokens,
   };
   const badges = BADGE_DEFINITIONS.map(def => computeBadge(def, metrics));
   const totalEarned = badges.filter(b => b.level > 0).length;

@@ -185,6 +185,56 @@ async function getTransactionHistory(uid, limit = 20, startAfterTimestamp = null
   }
 }
 
+async function getLeaderboard(uid) {
+  const driver = getDriver();
+  const session = driver.session();
+  try {
+    const query = `
+      MATCH (u:User)
+      WITH u, coalesce(u.mind_tokens, 0) as tokens
+      WHERE tokens > 0
+      ORDER BY tokens DESC
+      WITH collect({uid: u.uid, name: u.name, tokens: tokens, photoUrl: u.photoUrl}) as allUsers
+      RETURN allUsers
+    `;
+    const result = await session.executeRead(tx => tx.run(query));
+    
+    let allUsers = [];
+    if (result.records.length > 0) {
+      allUsers = result.records[0].get('allUsers').map(u => ({
+        ...u,
+        tokens: u.tokens && u.tokens.toNumber ? u.tokens.toNumber() : u.tokens
+      }));
+    }
+    
+    // Assign ranks
+    let rank = 1;
+    const top100 = allUsers.slice(0, 100).map(u => ({ ...u, rank: rank++ }));
+    
+    // Find current user stats
+    const myIndex = allUsers.findIndex(u => u.uid === uid);
+    const myRank = myIndex !== -1 ? myIndex + 1 : -1;
+    const myTokens = myIndex !== -1 ? allUsers[myIndex].tokens : 0;
+    
+    // Tokens to next rank
+    let tokensToNextRank = 0;
+    if (myIndex > 0) {
+      tokensToNextRank = allUsers[myIndex - 1].tokens - myTokens + 1;
+    } else if (myIndex === -1 && allUsers.length > 0) {
+      tokensToNextRank = allUsers[allUsers.length - 1].tokens - myTokens + 1;
+    }
+
+    return {
+      leaderboard: top100,
+      myRank,
+      myTokens,
+      tokensToNextRank
+    };
+  } finally {
+    await session.close();
+  }
+}
+
 module.exports = {
   awardTokens,
   awardForumAnswer,
@@ -192,4 +242,5 @@ module.exports = {
   awardStreakBonus,
   getBalance,
   getTransactionHistory,
+  getLeaderboard,
 };

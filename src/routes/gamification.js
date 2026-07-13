@@ -24,10 +24,12 @@ const {
   awardStreakBonus,
   getBalance,
   getTransactionHistory,
+  awardTokens,
 } = require('../services/tokenEconomy');
 const { calculateStreak, recordCheckIn } = require('../services/streakCalculator');
 const { calculateBadges, recordBadgeEarned } = require('../services/badgeCalculator');
 const { getPagination } = require('../utils/pagination');
+const { TOKENS_DAILY_LOGIN, TOKENS_BADGE_EARNED } = require('../utils/constants');
 
 // ── GET /api/tokens/:uid ──────────────────────────────────────────────
 router.get('/tokens/:uid', verifyFirebaseToken, async (req, res, next) => {
@@ -131,10 +133,13 @@ router.post('/streak/checkin', verifyFirebaseToken, async (req, res, next) => {
 
     // Check and award streak bonus at milestones
     let streakBonus = null;
-    if (!checkInResult.alreadyCheckedIn && streak.currentStreak > 0) {
-      if ([5, 10, 30].includes(streak.currentStreak)) {
-        streakBonus = await awardStreakBonus(uid, streak.currentStreak);
-      }
+    let loginTokens = null;
+    if (!checkInResult.alreadyCheckedIn) {
+      loginTokens = await awardTokens(uid, TOKENS_DAILY_LOGIN, 'daily_login');
+      if (streak.currentStreak > 0) {
+        if ([5, 10, 30].includes(streak.currentStreak)) {
+          streakBonus = await awardStreakBonus(uid, streak.currentStreak);
+        }
       const { broadcastToGlobal } = require('../services/chatService');
       broadcastToGlobal(uid, {
         type: 'global_new_message',
@@ -149,6 +154,7 @@ router.post('/streak/checkin', verifyFirebaseToken, async (req, res, next) => {
           matchId: '',
         }
       });
+      }
     }
 
     res.json({
@@ -157,6 +163,7 @@ router.post('/streak/checkin', verifyFirebaseToken, async (req, res, next) => {
         ...streak,
         alreadyCheckedIn: checkInResult.alreadyCheckedIn,
         streakBonus,
+        loginTokens,
       },
     });
   } catch (err) {
@@ -215,6 +222,7 @@ router.get('/badges/:uid', verifyFirebaseToken, async (req, res, next) => {
                 matchId: '',
               }
             });
+            await awardTokens(uid, TOKENS_BADGE_EARNED, 'badge_earned', { badgeId: badge.id, level: badge.level });
           }
         } catch (_) { /* non-critical */ }
       }
@@ -224,6 +232,17 @@ router.get('/badges/:uid', verifyFirebaseToken, async (req, res, next) => {
       success: true,
       data: result,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── GET /api/leaderboard ──────────────────────────────────────────────
+router.get('/leaderboard', verifyFirebaseToken, async (req, res, next) => {
+  try {
+    const { getLeaderboard } = require('../services/tokenEconomy');
+    const result = await getLeaderboard(req.user.uid);
+    res.json({ success: true, data: result });
   } catch (err) {
     next(err);
   }
